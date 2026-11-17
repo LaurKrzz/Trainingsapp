@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Training">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Algorithmus trifft Athletik – Trainingssteuerung</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667085;--bd:#e3e6ea;--ac:#0f766e;--ok:#16a34a;--wa:#d97706;--hi:#dc2626;--lo:#2563eb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--card:#1a1f26;--tx:#eceff3;--mu:#9aa4b2;--bd:#2b323c;--ac:#2dd4bf}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.w{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:0}h2{font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--mu);font-size:.85rem}
+nav{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap}
+nav button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on,.btn.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.k{font-size:1.7rem;font-weight:700}.l{color:var(--mu);font-size:.8rem}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;color:#fff;font-size:.78rem}
+.sc{overflow-x:auto}
+label{display:block;font-size:.8rem;color:var(--mu)}
+input,select{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}
+.tip{border-left:4px solid var(--ac);padding:8px 12px;background:var(--bg);border-radius:6px;margin:6px 0}
+.hide{display:none}
+ul{padding-left:18px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>Algorithmus trifft Athletik</h1>
+<div class="sub">Prototyp: KI-gestützte Trainingssteuerung · BORG Monsberger Graz · Diplomarbeit</div>
+<nav id="nav"></nav>
+
+<section id="t-dash">
+ <div class="g" id="kpis"></div>
+ <div class="c" style="margin-top:12px"><h2>Tageslast der letzten 28 Tage (sRPE = Dauer × RPE)</h2><div class="sc" id="ch1"></div></div>
+ <div class="c"><h2>Akut:Chronisch-Verhältnis (ACWR) – grüner Bereich 0,8–1,3</h2><div class="sc" id="ch2"></div></div>
+ <div class="c"><h2>Analyse</h2><div id="ana"></div></div>
+</section>
+
+<section id="t-log" class="hide">
+ <div class="c"><h2>Training erfassen</h2>
+ <div class="g">
+  <div><label>Datum</label><input type="date" id="fd"></div>
+  <div><label>Einheit</label><select id="ft"><option>Ausdauer</option><option>Kraft</option><option>Technik</option><option>Intervalle</option><option>Wettkampf</option><option>Regeneration</option></select></div>
+  <div><label>Dauer (Min.)</label><input type="number" id="fm" value="60" min="5" max="400"></div>
+  <div><label>Anstrengung RPE (1–10)</label><input type="number" id="fr" value="6" min="1" max="10"></div>
+  <div><label>Schlaf (Std.)</label><input type="number" id="fs" value="7.5" step="0.5" min="2" max="12"></div>
+  <div><label>Befinden (1–5)</label><input type="number" id="fw" value="3" min="1" max="5"></div>
+ </div>
+ <p><button class="btn p" id="add">Speichern</button> <button class="btn" id="demo">Demodaten laden</button> <button class="btn" id="clr">Alle löschen</button></p>
+ <p><button class="btn" id="exp">Daten exportieren</button> <button class="btn" id="imp">Daten importieren</button><input type="file" id="impf" accept=".json,application/json" class="hide"></p>
+ <p class="sub" id="msg" role="status"></p></div>
+ <div class="c sc"><h2>Letzte Einträge</h2><table id="tb"></table></div>
+</section>
+
+<section id="t-plan" class="hide">
+ <div class="c"><h2>Wochenplan generieren</h2>
+  <div class="g">
+   <div><label>Trainingsziel</label><select id="goal"><option value="aufbau">Leistungsaufbau</option><option value="erhalt">Erhalt</option><option value="peak">Wettkampf-Peak (Tapering)</option></select></div>
+   <div style="align-self:end"><button class="btn p" id="gen">Plan berechnen</button></div>
+  </div></div>
+ <div id="plan"></div>
+</section>
+
+<section id="t-info" class="hide">
+ <div class="c"><h2>So arbeitet das System</h2>
+ <ul>
+  <li><b>Trainingslast:</b> sRPE = Dauer × subjektive Anstrengung (Foster-Methode).</li>
+  <li><b>ACWR:</b> Last der letzten 7 Tage ÷ durchschnittliche Wochenlast der letzten 28 Tage. Werte über 1,5 gehen in Studien mit höherem Verletzungsrisiko einher.</li>
+  <li><b>Monotonie &amp; Strain:</b> Monotonie = Mittelwert ÷ Standardabweichung der Tageslast; Strain = Wochenlast × Monotonie.</li>
+  <li><b>Bereitschaft:</b> Score aus Schlaf und Befinden der letzten 3 Tage, mit Abzug bei hoher Belastungsspitze.</li>
+  <li><b>Planung:</b> Die Zielwochenlast wird regelbasiert aus ACWR, Bereitschaft und Ziel abgeleitet und auf Einheiten verteilt. Jede Empfehlung wird begründet (erklärbare KI).</li>
+ </ul></div>
+ <div class="g">
+  <div class="c"><h2>Chancen</h2><ul><li>Individuelle, datenbasierte Steuerung</li><li>Frühwarnung bei Überlastung</li><li>Zeitersparnis für Trainer:innen</li></ul></div>
+  <div class="c"><h2>Risiken</h2><ul><li>Fehlerhafte oder geschönte Eingaben</li><li>Blindes Vertrauen in Empfehlungen</li><li>Leistungsdruck durch Überwachung</li></ul></div>
+  <div class="c"><h2>Recht &amp; Ethik</h2><ul><li>Gesundheitsdaten sind besonders geschützt (DSGVO Art. 9) – Einwilligung nötig, bei Minderjährigen auch der Eltern</li><li>Datenminimierung, Löschrecht</li><li>EU-KI-Verordnung: Transparenz, menschliche Aufsicht</li><li>Trainer:in entscheidet, nicht die KI</li></ul></div>
+ </div>
+ <p class="sub">Hinweis: Prototyp ohne medizinische Aussagekraft. Daten bleiben ausschließlich lokal im Browser.</p>
+</section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const TABS=[['dash','Dashboard'],['log','Training erfassen'],['plan','Trainingsplan'],['info','Konzept &amp; Ethik']];
+let E=[];
+try{E=JSON.parse(localStorage.getItem('ts_entries')||'[]')}catch(e){E=[]}
+const save=()=>{try{localStorage.setItem('ts_entries',JSON.stringify(E))}catch(e){}};
+const iso=d=>d.toISOString().slice(0,10);
+const off=n=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+n);return d};
+const ld=e=>e.min*e.rpe;
+function daily(n,end=0){const a=[];for(let i=n-1;i>=0;i--){const k=iso(off(end-i));a.push({k,v:E.filter(e=>e.d===k).reduce((s,e)=>s+ld(e),0)})}return a}
+const sum=a=>a.reduce((s,x)=>s+x,0);
+function acwrAt(end){const d=daily(28,end).map(x=>x.v);const ac=sum(d.slice(21)),ch=sum(d)/4;return ch>0?ac/ch:null}
+function metrics(){
+ const d7=daily(7).map(x=>x.v),m=sum(d7)/7,sd=Math.sqrt(sum(d7.map(x=>(x-m)**2))/7);
+ const mono=sd>0?m/sd:0,week=sum(d7),chronic=sum(daily(28).map(x=>x.v))/4;
+ const acwr=chronic>0?week/chronic:null;
+ const r=E.filter(e=>e.d>=iso(off(-2)));let rd=null;
+ if(r.length){const s=sum(r.map(e=>e.sleep))/r.length,w=sum(r.map(e=>e.well))/r.length;
+  rd=Math.min(50,s/8*50)+w/5*50;if(acwr>1.5)rd-=15;rd=Math.max(0,Math.round(rd))}
+ return{week,chronic,acwr,mono,strain:week*mono,rd}}
+function zone(a){if(a==null)return['Keine Daten','#888'];
+ if(a<.8)return['Unterbelastet','var(--lo)'];if(a<=1.3)return['Optimal','var(--ok)'];
+ if(a<=1.5)return['Erhöht','var(--wa)'];return['Überlastungsrisiko','var(--hi)']}
+const f=(x,n=2)=>x==null?'–':x.toFixed(n).replace('.',',');
+
+function bars(data){const W=700,H=180,p=28,bw=(W-p)/data.length,mx=Math.max(1,...data.map(x=>x.v));
+ let s=`<svg viewBox="0 0 ${W} ${H+20}" style="min-width:560px;width:100%"><line x1="${p}" y1="${H}" x2="${W}" y2="${H}" stroke="var(--bd)"/>`;
+ data.forEach((x,i)=>{const h=x.v/mx*(H-10);s+=`<rect x="${p+i*bw+1}" y="${H-h}" width="${bw-2}" height="${h}" rx="2" fill="var(--ac)"/>`;
+  if(i%7==0)s+=`<text x="${p+i*bw}" y="${H+14}" font-size="10" fill="var(--mu)">${x.k.slice(8)}.${x.k.slice(5,7)}.</text>`});
+ return s+`<text x="2" y="12" font-size="10" fill="var(--mu)">${mx}</text></svg>`}
+function line(){const W=700,H=170,p=28,pts=[];for(let i=27;i>=0;i--)pts.push(acwrAt(-i));
+ const mx=2,y=v=>H-Math.min(v,mx)/mx*(H-10),bw=(W-p)/27;
+ let s=`<svg viewBox="0 0 ${W} ${H+20}" style="min-width:560px;width:100%"><rect x="${p}" y="${y(1.3)}" width="${W-p}" height="${y(.8)-y(1.3)}" fill="var(--ok)" opacity=".15"/>`;
+ [0,.8,1.3,1.5,2].forEach(v=>s+=`<text x="2" y="${y(v)+3}" font-size="10" fill="var(--mu)">${f(v,1)}</text>`);
+ let d='';pts.forEach((v,i)=>{if(v!=null)d+=(d?'L':'M')+(p+i*bw)+' '+y(v)});
+ return s+`<path d="${d}" fill="none" stroke="var(--ac)" stroke-width="2.5"/></svg>`}
+
+function dash(){const m=metrics(),z=zone(m.acwr);
+ const rdz=m.rd==null?'#888':m.rd>=70?'var(--ok)':m.rd>=50?'var(--wa)':'var(--hi)';
+ $('#kpis').innerHTML=`
+ <div class="c"><div class="l">Wochenlast (7 Tage)</div><div class="k">${Math.round(m.week)}</div><div class="l">Ø chronisch ${Math.round(m.chronic)}/Woche</div></div>
+ <div class="c"><div class="l">ACWR</div><div class="k">${f(m.acwr)}</div><span class="tag" style="background:${z[1]}">${z[0]}</span></div>
+ <div class="c"><div class="l">Monotonie / Strain</div><div class="k">${f(m.mono,1)}</div><div class="l">Strain ${Math.round(m.strain)}</div></div>
+ <div class="c"><div class="l">Bereitschaft (0–100)</div><div class="k" style="color:${rdz}">${m.rd??'–'}</div><div class="l">Schlaf &amp; Befinden</div></div>`;
+ $('#ch1').innerHTML=bars(daily(28));$('#ch2').innerHTML=line();
+ const t=[];
+ if(!E.length)t.push('Noch keine Daten – erfasse Trainings oder lade Demodaten im Tab „Training erfassen“.');
+ else{
+  if(m.acwr>1.5)t.push('ACWR über 1,5: Die Belastung stieg zu schnell. Empfehlung: Umfang diese Woche deutlich reduzieren.');
+  else if(m.acwr>1.3)t.push('ACWR leicht erhöht: Last nicht weiter steigern, Regenerationseinheiten einplanen.');
+  else if(m.acwr<.8)t.push('Unterbelastung: Es ist Spielraum für eine schrittweise Steigerung vorhanden.');
+  else t.push('Belastungsaufbau im optimalen Bereich.');
+  if(m.mono>2)t.push('Hohe Monotonie (>2): Zu gleichförmige Tage – härtere und leichtere Tage stärker abwechseln.');
+  if(m.rd!=null&&m.rd<50)t.push('Niedrige Bereitschaft: Schlaf und Erholung prüfen, Intensität zurücknehmen.');
+ }
+ $('#ana').innerHTML=t.map(x=>`<div class="tip">${x}</div>`).join('')}
+
+function table(){const l=[...E].sort((a,b)=>b.d.localeCompare(a.d)).slice(0,10);
+ $('#tb').innerHTML='<tr><th>Datum</th><th>Einheit</th><th>Min</th><th>RPE</th><th>Last</th><th>Schlaf</th><th>Befinden</th><th></th></tr>'+
+ l.map(e=>`<tr><td>${e.d}</td><td>${e.type}</td><td>${e.min}</td><td>${e.rpe}</td><td>${ld(e)}</td><td>${e.sleep}</td><td>${e.well}</td><td><button class="btn" data-id="${e.id}">✕</button></td></tr>`).join('')}
+
+function plan(){
+ const m=metrics(),goal=$('#goal').value;
+ if(!E.length){$('#plan').innerHTML='<div class="c">Bitte zuerst Trainingsdaten erfassen.</div>';return}
+ let fac=1,why=[];
+ const a=m.acwr??1;
+ if(a>1.5){fac=.7;why.push('ACWR '+f(a)+' &gt; 1,5 → Last um 30 % gesenkt')}
+ else if(a>1.3){fac=.85;why.push('ACWR '+f(a)+' erhöht → Last um 15 % gesenkt')}
+ else if(a<.8){fac=1.1;why.push('ACWR '+f(a)+' &lt; 0,8 → moderate Steigerung um 10 %')}
+ else{fac={aufbau:1.08,erhalt:1,peak:.8}[goal];why.push('ACWR im optimalen Bereich → Zielfaktor '+f(fac)+' für „'+$('#goal').selectedOptions[0].text+'“')}
+ if(m.rd!=null&&m.rd<50){fac*=.9;why.push('Bereitschaft '+m.rd+' &lt; 50 → zusätzlich −10 %')}
+ if(m.mono>2)why.push('Monotonie hoch → Wechsel aus harten und leichten Tagen erzwungen');
+ const target=m.chronic*fac,risky=a>1.3;
+ const T=[['Intensiv',8,.30],['Regeneration',3,.10],['Ruhetag',0,0],['Mittel',6,.25],['Regeneration',3,.10],['Grundlage',5,.25],['Ruhetag',0,0]];
+ let rows='',tot=0;
+ T.forEach((t,i)=>{let [n,r,w]=t;if(risky&&n==='Intensiv'){n='Grundlage';r=5}
+  const L=target*w,min=r?Math.round(L/r/5)*5:0;tot+=min*r;
+  const d=off(i+1).toLocaleDateString('de-AT',{weekday:'long',day:'2-digit',month:'2-digit'});
+  rows+=`<tr><td>${d}</td><td><b>${n}</b></td><td>${min?min+' Min.':'–'}</td><td>${r?'RPE '+r:'–'}</td><td>${min*r}</td></tr>`});
+ $('#plan').innerHTML=`<div class="c"><h2>Empfohlene Zielwoche: ca. ${Math.round(tot)} Lasteinheiten</h2>
+ <div class="sc"><table><tr><th>Tag</th><th>Einheit</th><th>Dauer</th><th>Intensität</th><th>Last</th></tr>${rows}</table></div></div>
+ <div class="c"><h2>Begründung (Erklärbarkeit)</h2>${why.map(x=>`<div class="tip">${x}</div>`).join('')}
+ <p class="sub">Vorschlag für Trainer:innen – die endgültige Entscheidung bleibt beim Menschen.</p></div>`}
+
+function demo(){E=[];let s=7;const r=()=>(s=(s*9301+49297)%233280)/233280;
+ const ty=['Ausdauer','Kraft','Intervalle','Technik','Regeneration'];
+ for(let i=55;i>=0;i--){const dow=off(-i).getDay();if(dow===0||(dow===3&&r()<.6))continue;
+  const ramp=i<7?1.35:1,hard=r()<.35,rpe=Math.round(hard?7+r()*2:4+r()*2);
+  E.push({id:'d'+i,d:iso(off(-i)),type:ty[Math.floor(r()*4)],min:Math.round((45+r()*50)*ramp/5)*5,rpe,sleep:+(6+r()*2.5).toFixed(1),well:Math.max(1,Math.min(5,Math.round(2+r()*3)))})}
+ save();render()}
+
+function render(){dash();table()}
+$('#nav').innerHTML=TABS.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('');
+$('#nav').onclick=e=>{const t=e.target.dataset.t;if(!t)return;
+ TABS.forEach(x=>{$('#t-'+x[0]).classList.toggle('hide',x[0]!==t)});
+ [...$('#nav').children].forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ if(t==='dash')dash();if(t==='plan')plan()};
+$('#nav').children[0].click();
+$('#fd').value=iso(off(0));
+$('#add').onclick=()=>{E.push({id:'u'+Date.now(),d:$('#fd').value,type:$('#ft').value,min:+$('#fm').value,rpe:+$('#fr').value,sleep:+$('#fs').value,well:+$('#fw').value});save();render()};
+$('#tb').onclick=e=>{const id=e.target.dataset.id;if(id){E=E.filter(x=>x.id!==id);save();render()}};
+$('#demo').onclick=demo;
+$('#clr').onclick=()=>{E=[];save();render()};
+$('#gen').onclick=plan;
+const msg=t=>{$('#msg').textContent=t};
+const TYPES=['Ausdauer','Kraft','Technik','Intervalle','Wettkampf','Regeneration'];
+$('#exp').onclick=async()=>{
+ if(!E.length){msg('Keine Daten zum Exportieren.');return}
+ const name='training-daten-'+iso(off(0))+'.json';
+ const blob=new Blob([JSON.stringify({app:'trainingssteuerung',version:1,exported:new Date().toISOString(),entries:E},null,1)],{type:'application/json'});
+ if(/iPhone|iPad|Android/.test(navigator.userAgent)){
+  try{const file=new File([blob],name,{type:'application/json'});
+   if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});msg('Export bereit: '+name);return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+ }
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(a.href),1000);msg('Export gespeichert: '+name)};
+$('#imp').onclick=()=>$('#impf').click();
+$('#impf').onchange=async e=>{const fl=e.target.files[0];e.target.value='';if(!fl)return;
+ try{const j=JSON.parse(await fl.text());const arr=Array.isArray(j)?j:j.entries;if(!Array.isArray(arr))throw 0;
+  const ok=arr.filter(x=>x&&typeof x.id==='string'&&/^[\w-]{1,40}$/.test(x.id)&&/^\d{4}-\d{2}-\d{2}$/.test(x.d)&&TYPES.includes(x.type)&&[x.min,x.rpe,x.sleep,x.well].every(v=>typeof v==='number'&&isFinite(v)))
+   .map(x=>({id:x.id,d:x.d,type:x.type,min:x.min,rpe:x.rpe,sleep:x.sleep,well:x.well}));
+  const have=new Set(E.map(x=>x.id)),neu=ok.filter(x=>!have.has(x.id));
+  E=E.concat(neu);save();render();
+  msg(neu.length+' neue Einträge importiert, '+(ok.length-neu.length)+' schon vorhanden'+(arr.length>ok.length?', '+(arr.length-ok.length)+' ungültig':'')+'.')
+ }catch(err){msg('Datei konnte nicht gelesen werden.')}};
+render();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+</script>
+</body>
+</html>
